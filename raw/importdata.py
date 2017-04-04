@@ -2,35 +2,44 @@ import pickle
 
 nodes = []
 struts = []
-forces = []
+lift_forces = []
+load_forces = []
+constraints = []
 
-filename = "psch_airship"
+folder = "shell_airship"
+filename = "shell_airship"
 
-with open(filename+".nodes", 'r') as inf:
+with open(folder+"/"+filename+".nodes", 'r') as inf:
     for infline in inf.readlines():
         nodes.append([float(a)/1000.0 for a in infline[1:-2].split(",")])
         #divide by 1000 to get coordinates in meters
 
-with open(filename+".struts",'r') as inf:
+with open(folder+"/"+filename+".struts",'r') as inf:
     for infline in inf.readlines():
         struts.append([int(round(float(a))) for a in infline[1:-2].split(",")][0:2])
 
-with open(filename+"_load.forces",'r') as inf:
+with open(folder+"/"+filename+"_load.forces",'r') as inf:
     inflines = inf.readlines()
     for i in range(0,len(inflines)-1,2):
         forcevect = [float(a) for a in inflines[i][1:-2].split(",")]
-        forces.append((int(round(float(inflines[i+1]))),forcevect))
+        load_forces.append((int(round(float(inflines[i+1]))),forcevect))
 
-with open(filename+"_lift.forces",'r') as inf:
+with open(folder+"/"+filename+"_lift.forces",'r') as inf:
     inflines = inf.readlines()
     for i in range(0,len(inflines)-1,2):
         forcevect = [float(a) for a in inflines[i][1:-2].split(",")]
-        forces.append((int(round(float(inflines[i+1]))),forcevect))
+        lift_forces.append((int(round(float(inflines[i+1]))),forcevect))
 
-print forces
+with open(folder+"/"+filename+".constraints",'r') as inf:
+    for infline in inf.readlines():
+        constraints.append(int(infline))
+
+print constraints
 rawdata = {}
 rawdata["nodes"] = nodes
 rawdata["struts"] = struts
-rawdata["forces"] = forces
-with open(filename+"_rawdata.pickle", 'wb') as outf:
+rawdata["load_forces"] = load_forces
+rawdata["lift_forces"] = lift_forces
+rawdata["constraints"] = constraints
+with open(folder+"/"+filename+"_rawdata.pickle", 'wb') as outf:
     pickle.dump(rawdata,outf,pickle.HIGHEST_PROTOCOL)
