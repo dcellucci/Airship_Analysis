@@ -12,8 +12,15 @@ import pickle
 
 
 
+filenames = ["psch_airship_b","shell_airship"]
+foldernames = ["psch_airship_b","shell_airship"]
+node_lifts = [33,40] #N, per node
+
+
+index = 1
 # Reading rawdata file
-with open('raw/shell_airship/shell_airship_rawdata.pickle', 'rb') as f:
+path = 'raw/{0}/{1}_rawdata.pickle'.format(foldernames[index], filenames[index])
+with open(path, 'rb') as f:
     pa_rawdata = pickle.load(f)
 
 # Material Properties
@@ -21,7 +28,7 @@ with open('raw/shell_airship/shell_airship_rawdata.pickle', 'rb') as f:
 nodes = np.array(pa_rawdata["nodes"])
 frames = np.array(pa_rawdata["struts"])
 lift_forces = pa_rawdata["lift_forces"]
-load_forces = pa_rawdata["load_forces"]
+load_frames = pa_rawdata["load_struts"]
 
 #Physical Voxel Properties
 node_radius = 0
@@ -33,12 +40,26 @@ node_radius = 0
 frame_props = {"nu"  : 0.3, #poisson's ratio
 			   "d1"	 : 0.0624, #m
 			   "th"	 : 0.0312, #m
-			   "E"   :  5e7, #N/m^2
-			   "rho" :  1600, #kg/m^3
+			   "E"   :  1e7, #N/m^2
+               'yield_strength':117e6 ,#N/m^2
+			   "rho" :  18.579, #kg/m^3
+               "node_mass": 0.015, #kg
 			   "beam_divisions" : 1,
 			   "cross_section"  : 'circular',
 			   "roll": 0,
 			   "Le":0.88}
+
+lframe_props = {"nu"  : 0.3, #poisson's ratio
+			   "d1"	 : 0.0624, #m
+			   "th"	 : 0.0312, #m
+               'yield_strength':117e6 ,#N/m^2
+			   "E"   :  1e6, #N/m^2
+			   "rho" :  1, #kg/m^3
+               "node_mass": 0.015, #kg
+			   "beam_divisions" : 1,
+			   "cross_section"  : 'circular',
+			   "roll": 0,
+			   "Le":10}
 
 #Node Map Population
 #Referencing the geometry-specific cuboct.py file.
@@ -49,36 +70,28 @@ constraints = []
 loads = []
 
 daniel = 80*9.8 #N
-total_load = 14 #N, per node
 
 ##
 ## Adding Loads to the structure
 ##
-
-factor = 14
-print("Lift Load: {0} N".format(factor))
+node_lift = node_lifts[index]
+#print("Lift Load: {0} N".format(factor))
 for load in lift_forces:
     for c in range(3):
-        loads.append({'node':load[0],'DOF':c, 'value':load[1][c]*factor})
+        loads.append({'node':load[0],'DOF':c, 'value':load[1][c]*node_lift})
 
-
-factor = 14
-print("Lift Load: {0} N".format(factor))
-for load in load_forces:
-    for c in range(3):
-        loads.append({'node':load[0],'DOF':c, 'value':load[1][c]*factor})
 
 #print loads
 for nodeid in pa_rawdata["constraints"]:
-    #constraints.append({'node':nodeid, 'DOF':0, 'value':0})
-    #constraints.append({'node':nodeid, 'DOF':1, 'value':0})
+    constraints.append({'node':nodeid, 'DOF':0, 'value':0})
+    constraints.append({'node':nodeid, 'DOF':1, 'value':0})
     constraints.append({'node':nodeid, 'DOF':2, 'value':0})
     #constraints.append({'node':nodeid, 'DOF':3, 'value':0})
     #constraints.append({'node':nodeid, 'DOF':4, 'value':0})
     #constraints.append({'node':nodeid, 'DOF':5, 'value':0})
 
-constraints.append({'node':127, 'DOF':0, 'value':0})
-constraints.append({'node':127, 'DOF':1, 'value':0})
+#constraints.append({'node':127, 'DOF':0, 'value':0})
+#constraints.append({'node':127, 'DOF':1, 'value':0})
 
 #print(len(loads))
 
@@ -90,10 +103,12 @@ constraints.append({'node':127, 'DOF':1, 'value':0})
 #     #  #  #     #    #     # #     #    #    #       #     #    #
  #####  ### #     #    #######  #####     #    #        #####     #
 
-
+#Format node positions
+out_nodes = np.array(nodes)
 
 #Group frames with their characteristic properties.
 out_frames = [(np.array(frames),[],{'E'   : frame_props["E"],
+								 'yield_strength': frame_props["yield_strength"],
 								 'rho' : frame_props["rho"],
 								 'nu'  : frame_props["nu"],
 								 'd1'  : frame_props["d1"],
@@ -101,15 +116,18 @@ out_frames = [(np.array(frames),[],{'E'   : frame_props["E"],
 								 'beam_divisions' : frame_props["beam_divisions"],
 								 'cross_section'  : frame_props["cross_section"],
 								 'roll': frame_props["roll"],
-								 'loads':{'element':0},
+                                 'node_mass':frame_props["node_mass"],
+                                 'loads':{'element':0},
 								 'prestresses':{'element':0},
 								 'Le': frame_props["Le"]})]
+for lframe in load_frames:
+    lframe_props["Le"] = np.linalg.norm(out_nodes[lframe[0]]-out_nodes[lframe[1]])
+    out_frames.append((np.array([lframe]),[],lframe_props))
 
-#Format node positions
-out_nodes = np.array(nodes)
+
 
 #Global Arguments
-global_args = {'frame3dd_filename': "br_s_mt", 'length_scaling':1,"using_Frame3dd":False,"debug_plot":True, "gravity" : [0,0,0]}
+global_args = {'frame3dd_filename': "br_s_mt", 'length_scaling':1,"using_Frame3dd":False,"debug_plot":True, "gravity" : [0,0,-9.8]}
 
 if global_args["using_Frame3dd"]:
 	frame3dd.write_frame3dd_file(out_nodes, global_args, out_frames, constraints,loads)
@@ -131,4 +149,4 @@ else:
 
 if global_args["debug_plot"]:
     import pfea.util.debugplot_pyqtgraph as dbp
-    dbp.debugplot(nodes,out_frames,res_displace,Q,loads,constraints,5)
+    dbp.debugplot(nodes,out_frames,res_displace,Q,loads,constraints,1, axial_forces=True)
